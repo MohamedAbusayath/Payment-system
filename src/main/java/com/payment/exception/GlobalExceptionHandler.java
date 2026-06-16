@@ -9,14 +9,17 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import com.payment.paymentClass.ErrorResponse;
-import com.payment.service.PaymentService;
+import com.payment.dto.PaymentResponseDTO;
+import com.payment.entity.Payment;
+import com.payment.repository.PaymentRepo;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-
+	PaymentRepo repo;
 	@Autowired
-	private PaymentService ser;
+	public GlobalExceptionHandler(PaymentRepo repo) {
+		this.repo=repo;
+	}
 	
 	@ExceptionHandler(Exception.class)
 	@ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -26,19 +29,24 @@ public class GlobalExceptionHandler {
 	
 	@ExceptionHandler(MethodArgumentNotValidException.class)
 	@ResponseStatus(HttpStatus.BAD_REQUEST)
-	public ErrorResponse handleValidation(
+	public PaymentResponseDTO handleValidation(
 	        MethodArgumentNotValidException ex) {
-		
-	    ErrorResponse response = new ErrorResponse();
+	      
+		   Payment payment = new Payment();
+		   payment.setStatus("FAILED");
+		   payment.setMessage( ex.getBindingResult()
+		              .getFieldError()
+		              .getDefaultMessage());
+		   payment.setPaymentTime(LocalDateTime.now());
+		   payment.setPaymentType("INVALID_REQUEST");
 
-	    response.setStatus("FAILED");
-	    response.setMessage(
-	            ex.getBindingResult()
-	              .getFieldError()
-	              .getDefaultMessage());
-
-	    response.setTimestamp(LocalDateTime.now());
-	    ser.failedTransaction();
-	    return response;
+		  Payment save = repo.save(payment);
+		  PaymentResponseDTO res=new PaymentResponseDTO();
+	    	res.setStatus(save.getStatus());
+	    	res.setMessage(save.getMessage());
+	    	res.setPaymentType(save.getPaymentType());
+	    	res.setPaymentTime(save.getPaymentTime());
+	    	res.setAmount(save.getAmount());
+	    return res;
 	}
 }
