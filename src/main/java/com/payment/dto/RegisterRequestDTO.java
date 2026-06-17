@@ -1,6 +1,10 @@
 package com.payment.dto;
 
 
+import com.payment.enums.UserRole;
+
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -19,6 +23,6 @@ public class RegisterRequestDTO {
 	    @NotEmpty(message = "Password is required")
 	    private String password;
 
-	    @NotEmpty(message = "Role is required")
-	    private String role;
+	    @Enumerated(EnumType.STRING)
+	    private UserRole role;
 }

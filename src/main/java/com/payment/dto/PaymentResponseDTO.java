@@ -2,6 +2,8 @@ package com.payment.dto;
 
 import java.time.LocalDateTime;
 
+import com.payment.enums.PaymentStatus;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -9,7 +11,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Data
 public class PaymentResponseDTO {
-	String status;
+	PaymentStatus status;
 	String message;
 	String paymentType;
 	double amount;

@@ -1,6 +1,10 @@
 package com.payment.entity;
 
+import com.payment.enums.UserRole;
+
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -19,5 +23,6 @@ public class User {
 	private long id;
 	private String username;
 	private String password;
-	private String role;
+	@Enumerated(EnumType.STRING)
+	private UserRole  role;
 }

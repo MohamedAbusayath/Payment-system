@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.payment.dto.PaymentResponseDTO;
 import com.payment.entity.Payment;
+import com.payment.enums.PaymentStatus;
 import com.payment.repository.PaymentRepo;
 
 @RestControllerAdvice
@@ -33,7 +34,7 @@ public class GlobalExceptionHandler {
 	        MethodArgumentNotValidException ex) {
 	      
 		   Payment payment = new Payment();
-		   payment.setStatus("FAILED");
+		   payment.setStatus(PaymentStatus.REJECTED);
 		   payment.setMessage( ex.getBindingResult()
 		              .getFieldError()
 		              .getDefaultMessage());

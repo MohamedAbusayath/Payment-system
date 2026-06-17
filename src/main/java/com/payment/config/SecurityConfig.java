@@ -18,51 +18,37 @@ import com.payment.security.JwtAuthenticationFilter;
 @EnableWebSecurity
 public class SecurityConfig {
 
-	 private final JwtAuthenticationFilter jwtFilter;
+	private final JwtAuthenticationFilter jwtFilter;
 
-	    public SecurityConfig(
-	            JwtAuthenticationFilter jwtFilter) {
+	public SecurityConfig(JwtAuthenticationFilter jwtFilter) {
 
-	        this.jwtFilter = jwtFilter;
-	    }
+		this.jwtFilter = jwtFilter;
+	}
 
-	    @Bean
-	    public SecurityFilterChain security(
-	            HttpSecurity http)
-	            throws Exception {
-
-	        return http
-	                .csrf(csrf ->
-	                        csrf.disable())
-	                .sessionManagement(session ->
-	                        session.sessionCreationPolicy(
-	                                SessionCreationPolicy
-	                                        .STATELESS)).authorizeHttpRequests(req -> req
-	                                        .requestMatchers(
-	                                                "/auth/register",
-	                                                "/auth/login"
-	                                        )
-	                                        .permitAll()
-	                                        .anyRequest()
-	                                        .authenticated())
-
-	                        .addFilterBefore(
-	                                jwtFilter,
-	                                UsernamePasswordAuthenticationFilter.class)
-
-	                        .build();
-	    }
-	
 	@Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-	
-	@Bean
-	public AuthenticationManager authenticationManager(
-	        AuthenticationConfiguration config)
-	        throws Exception {
+	public SecurityFilterChain security(HttpSecurity http) throws Exception {
 
-	    return config.getAuthenticationManager();
+		return http.csrf(csrf -> csrf.disable())
+				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+				.authorizeHttpRequests(req -> req
+						.requestMatchers("auth/register", "auth/login").permitAll()
+						.requestMatchers("/api/payment", "/api/payment/my").hasRole("MAKER")
+						.requestMatchers("/api/payment/pending", "/api/payment/approve/**", "/api/payment/reject/**")
+						.hasRole("CHECKER")
+						.anyRequest().authenticated())
+				.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+
+				.build();
+	}
+
+	@Bean
+	public PasswordEncoder passwordEncoder() {
+		return new BCryptPasswordEncoder();
+	}
+
+	@Bean
+	public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+
+		return config.getAuthenticationManager();
 	}
 }
