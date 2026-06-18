@@ -30,14 +30,12 @@ public class SecurityConfig {
 
 		return http.csrf(csrf -> csrf.disable())
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-				.authorizeHttpRequests(req -> req
-						.requestMatchers("auth/register", "auth/login").permitAll()
+				.authorizeHttpRequests(req -> req.requestMatchers("auth/register", "auth/login").permitAll()
 						.requestMatchers("/api/payment", "/api/payment/my").hasRole("MAKER")
-						.requestMatchers("/api/payment/pending", "/api/payment/approve/**", "/api/payment/reject/**")
-						.hasRole("CHECKER")
-						.anyRequest().authenticated())
+						.requestMatchers("/api/payment/pending", "/api/payment/approve/**", "/api/payment/reject/**",
+								"/api/payment/delete/**")
+						.hasRole("CHECKER").anyRequest().authenticated())
 				.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-
 				.build();
 	}
 

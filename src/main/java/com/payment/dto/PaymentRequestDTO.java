@@ -11,7 +11,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Data
 public class PaymentRequestDTO {
-	 @Positive(message = "Amount must be greater than zero")
+	
+	@Positive(message = "Amount must be greater than zero")
 	double amount;
 	@NotNull(message = "Payment Type is Missing")
 	@NotEmpty(message = "Payment Type is Missing")

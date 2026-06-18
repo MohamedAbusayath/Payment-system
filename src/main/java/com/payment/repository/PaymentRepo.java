@@ -14,4 +14,5 @@ public interface PaymentRepo extends JpaRepository<Payment, Long>{
 	int countByStatus(PaymentStatus approved);
 	List<Payment>findByStatus(PaymentStatus status);
 	List<Payment> findByCreatedBy(String username);
+	List<Payment> findByPaymentTypeContainingIgnoreCase(String keyword);
 }

@@ -12,6 +12,6 @@ public class LoginRequestDTO {
 
 	@NotEmpty(message = "Username is required")
 	private String username;
-	@NotEmpty(message = "Username is required")
+	@NotEmpty(message = "password is required")
 	private String password;
 }

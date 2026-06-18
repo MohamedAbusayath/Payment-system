@@ -2,6 +2,7 @@ package com.payment.controller;
 
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.payment.dto.PaymentRequestDTO;
 import com.payment.dto.PaymentResponseDTO;
@@ -55,5 +57,23 @@ public class PaymentController {
 	public ResponseEntity<PaymentSummaryDTO> details() {
 		return ResponseEntity.ok(ser.paymentSum());
 	}
+	
+	@GetMapping("payment/get")
+	public ResponseEntity<Page<Payment>> getPay(@RequestParam int page,@RequestParam int size){
+		return ResponseEntity.ok(ser.getPay(page, size));
+	}
+	
+	@GetMapping("payment/search")
+	public ResponseEntity<List<Payment>> search(@RequestParam String keyword){
+		return ResponseEntity.ok(ser.search(keyword));
+	}
+	
+	
+	
+	
+//	@DeleteMapping("payment/delete")
+//	public ResponseEntity<String> delete(@PathVariable long id){
+//		return ResponseEntity.ok(ser.delete(id));
+//	}
 	
 }
