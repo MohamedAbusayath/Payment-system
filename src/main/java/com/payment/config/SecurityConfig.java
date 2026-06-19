@@ -30,11 +30,15 @@ public class SecurityConfig {
 
 		return http.csrf(csrf -> csrf.disable())
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-				.authorizeHttpRequests(req -> req.requestMatchers("auth/register", "auth/login").permitAll()
+				.authorizeHttpRequests(req -> req.requestMatchers("/auth/register", "/auth/login","/api/payment/history").permitAll()
 						.requestMatchers("/api/payment", "/api/payment/my").hasRole("MAKER")
 						.requestMatchers("/api/payment/pending", "/api/payment/approve/**", "/api/payment/reject/**",
 								"/api/payment/delete/**")
-						.hasRole("CHECKER").anyRequest().authenticated())
+						.hasRole("CHECKER").requestMatchers(
+						        "/api/payment/get")
+						.hasAnyRole(
+						        "CHECKER",
+						        "ADMIN").anyRequest().authenticated())
 				.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
 				.build();
 	}
@@ -46,7 +50,6 @@ public class SecurityConfig {
 
 	@Bean
 	public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-
 		return config.getAuthenticationManager();
 	}
 }
