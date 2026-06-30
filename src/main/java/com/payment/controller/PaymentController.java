@@ -1,8 +1,13 @@
 package com.payment.controller;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,9 +18,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.payment.dto.PaymentHistoryDTO;
 import com.payment.dto.PaymentRequestDTO;
 import com.payment.dto.PaymentResponseDTO;
 import com.payment.dto.PaymentSummaryDTO;
+import com.payment.dto.ReportRequestDTO;
 import com.payment.entity.AuditLog;
 import com.payment.entity.Payment;
 import com.payment.exception.InvalidPaymentException;
@@ -35,7 +44,7 @@ public class PaymentController {
 
 	@PostMapping("/payment")
 	public ResponseEntity<PaymentResponseDTO> pay(@Valid @RequestBody PaymentRequestDTO req, Authentication auth)
-			throws InvalidPaymentException {
+			throws InvalidPaymentException, JsonProcessingException {
 		return ResponseEntity.ok(ser.savePay(req, auth.getName()));
 	}
 
@@ -66,16 +75,6 @@ public class PaymentController {
 		return ResponseEntity.ok(ser.paymentSum());
 	}
 
-//	@GetMapping("payment/get")
-//	public ResponseEntity<Page<Payment>> getPay(@RequestParam int page,@RequestParam int size){
-//		return ResponseEntity.ok(ser.getPay(page, size));
-//	}
-//	
-//	@GetMapping("payment/search")
-//	public ResponseEntity<List<Payment>> search(@RequestParam String keyword){
-//		return ResponseEntity.ok(ser.search(keyword));
-//	}
-
 	@GetMapping("payment/get")
 	public ResponseEntity<Page<Payment>> get(@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "5") int size, @RequestParam(required = false) String keyword) {
@@ -87,4 +86,25 @@ public class PaymentController {
 		return ResponseEntity.ok(ser.history(auth));
 	}
 
+	@PostMapping("payment/report")
+	public ResponseEntity<InputStreamResource> generateReport(@RequestBody ReportRequestDTO request)
+			throws IOException {
+
+		ByteArrayInputStream in = ser.report(request);
+
+		HttpHeaders headers = new HttpHeaders();
+
+		headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=payments-report.xlsx");
+
+		return ResponseEntity.ok().headers(headers)
+				.contentType(
+						MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+				.body(new InputStreamResource(in));
+	}
+	
+	@PostMapping("payment/his/{id}")
+	public ResponseEntity<PaymentHistoryDTO> getHis(@RequestParam Long id){
+		return ResponseEntity.ok(ser.getPaymentHistory(id));
+		
+	}
 }

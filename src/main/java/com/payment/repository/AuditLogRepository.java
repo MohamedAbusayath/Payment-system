@@ -7,4 +7,5 @@ import com.payment.entity.AuditLog;
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
 
 	List<AuditLog> findByUsername(String username);
+	 List<AuditLog> findByPaymentIdOrderByActionTimeAsc(Long paymentId);
 }

@@ -1,5 +1,6 @@
 package com.payment.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,4 +17,6 @@ public interface PaymentRepo extends JpaRepository<Payment, Long>,JpaSpecificati
 	List<Payment>findByStatus(PaymentStatus status);
 	List<Payment> findByCreatedBy(String username);
 	List<Payment> findByPaymentTypeContainingIgnoreCase(String keyword);
+	
+	List<Payment> findByStatusAndPaymentTimeBetween(PaymentStatus status,LocalDateTime start,LocalDateTime end);
 }
