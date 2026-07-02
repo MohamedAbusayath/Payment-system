@@ -29,6 +29,7 @@ public class Payment {
 	private double amount;
 	@Enumerated(EnumType.STRING)
 	private PaymentStatus status;
+	private String email;
 	private String createdBy;
 	private String message;
 	private LocalDateTime paymentTime;

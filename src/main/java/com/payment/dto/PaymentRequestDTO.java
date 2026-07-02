@@ -17,6 +17,7 @@ public class PaymentRequestDTO {
 	@NotNull(message = "Payment Type is Missing")
 	@NotEmpty(message = "Payment Type is Missing")
 	String paymentType;
+	String email;
 	String cardNo;
 	String cardHolder;
 	String accountNo;

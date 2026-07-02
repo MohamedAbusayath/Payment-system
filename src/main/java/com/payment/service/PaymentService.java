@@ -25,6 +25,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.payment.dto.FraudRequest;
 import com.payment.dto.FraudResponse;
+import com.payment.dto.PaymentEvent;
 import com.payment.dto.PaymentEventDTO;
 import com.payment.dto.PaymentHistoryDTO;
 import com.payment.dto.PaymentRequestDTO;
@@ -37,6 +38,7 @@ import com.payment.entity.Payment;
 import com.payment.enums.PaymentStatus;
 import com.payment.enums.RetryStatus;
 import com.payment.exception.InvalidPaymentException;
+import com.payment.notification.PaymentEventProducer;
 import com.payment.repository.AuditLogRepository;
 import com.payment.repository.FailedTransactionRepository;
 import com.payment.repository.PaymentRepo;
@@ -49,15 +51,17 @@ public class PaymentService {
 	private final RestTemplate rest;
 	private final FailedTransactionRepository failedRepo;
 	private final ObjectMapper objectMapper;
+	private final PaymentEventProducer produce;
 
 	@Autowired
 	public PaymentService(PaymentRepo repo, AuditLogRepository au_repo, RestTemplate rest,
-			FailedTransactionRepository failedRepo, ObjectMapper objectMapper) {
+			FailedTransactionRepository failedRepo, ObjectMapper objectMapper, PaymentEventProducer produce) {
 		this.repo = repo;
 		this.au_repo = au_repo;
 		this.rest = rest;
 		this.failedRepo = failedRepo;
 		this.objectMapper = objectMapper;
+		this.produce = produce;
 	}
 
 	public PaymentResponseDTO savePay(PaymentRequestDTO req, String username)
@@ -89,7 +93,7 @@ public class PaymentService {
 		payment.setPaymentType(req.getPaymentType());
 		payment.setCreatedBy(username);
 		payment.setPaymentTime(LocalDateTime.now());
-
+		payment.setEmail(req.getEmail());
 		payment.setStatus(PaymentStatus.FRAUD_PENDING);
 		payment.setMessage("Fraud Verification Pending");
 
@@ -178,7 +182,25 @@ public class PaymentService {
 		res.setAmount(payment.getAmount());
 		res.setPaymentTime(payment.getPaymentTime());
 
+		produce.publishPayEvent(createPaymentEvent(payment));
+
 		return res;
+	}
+
+	// producer method......
+	private PaymentEvent createPaymentEvent(Payment payment) {
+
+		PaymentEvent event = new PaymentEvent();
+
+		event.setPaymentId(payment.getId());
+		event.setPaymentType(payment.getPaymentType());
+		event.setAmount(payment.getAmount());
+		event.setStatus(payment.getStatus());
+		event.setEmail(payment.getEmail());
+		event.setMessage(payment.getMessage());
+		event.setPaymentTime(payment.getPaymentTime());
+
+		return event;
 	}
 
 	public List<Payment> pendingStatus() {
@@ -202,6 +224,7 @@ public class PaymentService {
 		log.setActionTime(LocalDateTime.now());
 
 		au_repo.save(log);
+		produce.publishPayEvent(createPaymentEvent(save));// approve produce
 		return save;
 	}
 
@@ -221,6 +244,7 @@ public class PaymentService {
 		log.setActionTime(LocalDateTime.now());
 
 		au_repo.save(log);
+		produce.publishPayEvent(createPaymentEvent(save));
 		return save;
 	}
 
@@ -233,11 +257,6 @@ public class PaymentService {
 		sum.setSuccessfulTransaction(ap);
 		sum.setFailedtransaction(re);
 		return sum;
-	}
-
-	public String delete(long id) {
-		repo.deleteById(id);
-		return "Payment Deleted";
 	}
 
 	public List<Payment> myPay(String name) {
