@@ -8,10 +8,13 @@ import com.payment.dto.PaymentEvent;
 import lombok.RequiredArgsConstructor;
 
 @Service
-@RequiredArgsConstructor
 public class PaymentEventConsumer {
 
 	private final EmailService emailSer;
+
+	public PaymentEventConsumer(EmailService emailSer) {
+		this.emailSer = emailSer;
+	}
 
 	@KafkaListener(topics = "payment-events", groupId = "payment-group")
 	public void consume(PaymentEvent event) {

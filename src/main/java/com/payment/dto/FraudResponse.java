@@ -1,14 +1,28 @@
 package com.payment.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
-@Data
+
 @AllArgsConstructor
 @NoArgsConstructor
 public class FraudResponse {
 
 	private String status;
 	private String message;
+
+	public String getStatus() {
+		return status;
+	}
+
+	public void setStatus(String status) {
+		this.status = status;
+	}
+
+	public String getMessage() {
+		return message;
+	}
+
+	public void setMessage(String message) {
+		this.message = message;
+	}
 }

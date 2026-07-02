@@ -9,10 +9,13 @@ import com.payment.dto.PaymentEvent;
 import lombok.RequiredArgsConstructor;
 
 @Service
-@RequiredArgsConstructor
 public class EmailService {
 
 	private final JavaMailSender mailSender;
+
+	public EmailService(JavaMailSender mailSender) {
+		this.mailSender = mailSender;
+	}
 
 	public void sendNotification(PaymentEvent event) {
 
