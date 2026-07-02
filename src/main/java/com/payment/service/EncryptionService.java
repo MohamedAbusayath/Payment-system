@@ -8,14 +8,16 @@ import javax.crypto.Cipher;
 
 import javax.crypto.spec.SecretKeySpec;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class EncryptionService {
 
     private static final String AES = "AES";
-    private static final String SECRET_KEY =
-            "MYSECRETKEY12345";
+    
+    @Value("${secret-key}")
+    private static  String SECRET_KEY;
 
     private Key generateKey() {
         return new SecretKeySpec(

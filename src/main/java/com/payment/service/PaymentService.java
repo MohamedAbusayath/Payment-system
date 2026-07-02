@@ -5,6 +5,7 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
@@ -52,6 +53,9 @@ public class PaymentService {
 	private final FailedTransactionRepository failedRepo;
 	private final ObjectMapper objectMapper;
 	private final PaymentEventProducer produce;
+
+	@Value("${fraud.service.url}")
+	private String url;
 
 	@Autowired
 	public PaymentService(PaymentRepo repo, AuditLogRepository au_repo, RestTemplate rest,
@@ -103,8 +107,6 @@ public class PaymentService {
 
 		fraudRequest.setCardNo(req.getCardNo());
 		fraudRequest.setAmount(req.getAmount());
-
-		String url = "http://localhost:8081/fraud/check";
 
 		try {
 

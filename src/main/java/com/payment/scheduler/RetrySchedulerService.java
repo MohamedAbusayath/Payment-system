@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -38,10 +39,10 @@ public class RetrySchedulerService {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private static final String FRAUD_URL =
-            "http://localhost:8081/fraud/check";
+    @Value("${fraud.service.url}")
+    private static String FRAUD_URL ;;
 
-    @Scheduled(fixedRate = 30000) // Every 5 Minutes
+    @Scheduled(fixedRate = 3000) 
     public void retryFailedTransactions() {
 
         System.out.println("Retry Scheduler Running...");

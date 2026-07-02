@@ -1,5 +1,6 @@
 package com.payment.notification;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
@@ -12,8 +13,8 @@ import lombok.RequiredArgsConstructor;
 public class PaymentEventProducer {
 
 	private final KafkaTemplate<String, PaymentEvent> kafkaTem;
-	
-	private static final String TOPIC="payment-events";
+
+	private static String TOPIC="payment-events";
 	
 	public void publishPayEvent(PaymentEvent event) {
 		kafkaTem.send(TOPIC,event);
