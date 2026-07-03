@@ -3,7 +3,8 @@ package com.payment.scheduler;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -25,24 +26,28 @@ import com.payment.repository.PaymentRepo;
 @Component
 public class RetrySchedulerService {
 
-    private FailedTransactionRepository failedRepo;
+    private final FailedTransactionRepository failedRepo;
 
-    private PaymentRepo paymentRepo;
+    private final PaymentRepo paymentRepo;
 
-    private AuditLogRepository auditRepo;
+    private final AuditLogRepository auditRepo;
 
+    private final RestTemplate restTemplate;
 
-    private RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
-    private ObjectMapper objectMapper;
-
-    public RetrySchedulerService(ObjectMapper objectMapper, RestTemplate restTemplate, AuditLogRepository auditRepo, PaymentRepo paymentRepo, FailedTransactionRepository failedRepo) {
+    public RetrySchedulerService(ObjectMapper objectMapper,RestTemplate restTemplate,
+                                 AuditLogRepository auditRepo,PaymentRepo paymentRepo,
+                                 FailedTransactionRepository failedRepo) {
         this.objectMapper = objectMapper;
         this.restTemplate = restTemplate;
         this.auditRepo = auditRepo;
         this.paymentRepo = paymentRepo;
         this.failedRepo = failedRepo;
     }
+
+    private static final Logger log =
+            LoggerFactory.getLogger(RetrySchedulerService.class);
 
     @Value("${fraud.service.url}")
     private  String FRAUD_URL ;
@@ -57,6 +62,9 @@ public class RetrySchedulerService {
             return;
         }
         System.out.println("Retrying " + transactions.size() + " failed transaction(s)");
+
+        log.info("Retrying {} failed transaction(s)",transactions.size());
+
         for (FailedTransaction f : transactions) {
 
             try {
@@ -87,11 +95,9 @@ public class RetrySchedulerService {
                                 fraudRequest,
                                 FraudResponse.class
                         );
-
               
                 Payment pay =getPayId(f.getTransactionId());
-
-                
+                if(fraudResponse==null) throw new UsernameNotFoundException("FraudResponse Null");
                 if ("SAFE".equals(fraudResponse.getStatus())) {
 
                     if (pay.getAmount() <= 1000) {
@@ -128,21 +134,20 @@ public class RetrySchedulerService {
 
                 failedRepo.save(f);
 
-                Payment pay =
-                        paymentRepo.findById(f.getTransactionId())
-                                .orElse(null);
+                Payment pay =getPayId(f.getTransactionId());
 
                 if (pay != null) {
                     saveAudit(pay, "FRAUD RETRY ATTEMPT");
                 }
 
-                System.out.println("Retry Failed : " + ex.getMessage());
+                log.error("Retry Filed {}:",ex.getMessage());
             }
 
         }
 
     }
 
+    //audit save
     private void saveAudit(Payment pay, String action) {
 
         AuditLog log = new AuditLog();
@@ -166,16 +171,19 @@ public class RetrySchedulerService {
     }
 
 
+    //payment status
     private void updatePaymentStatus(Payment pay,PaymentStatus status,String msg){
         pay.setStatus(status);
         pay.setMessage(msg);
         paymentRepo.save(pay);
     }
 
+    //get payment using id .. if it not, throw the exception
     private Payment getPayId(Long id){
        return paymentRepo.findById(id).orElseThrow(()->new UsernameNotFoundException("Payment Not found"));
     }
 
+    //Retry
     private void updateRetryStatus(FailedTransaction fail,
                                    RetryStatus status) {
 

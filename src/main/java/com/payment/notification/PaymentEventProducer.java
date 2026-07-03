@@ -1,12 +1,11 @@
 package com.payment.notification;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import com.payment.dto.PaymentEvent;
-
-import lombok.RequiredArgsConstructor;
 
 @Service
 public class PaymentEventProducer {
@@ -17,10 +16,12 @@ public class PaymentEventProducer {
 		this.kafkaTem = kafkaTem;
 	}
 
-	private static String TOPIC="payment-events";
+	private static final Logger log= LoggerFactory.getLogger(PaymentEventProducer.class);
+
+	private static final String TOPIC="payment-events";
 	
 	public void publishPayEvent(PaymentEvent event) {
 		kafkaTem.send(TOPIC,event);
-		System.out.println("payment event published:"+event);
+		log.info("payment event published:{}",event);
 	}
 }

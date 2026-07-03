@@ -1,11 +1,12 @@
 package com.payment.notification;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
 import com.payment.dto.PaymentEvent;
 
-import lombok.RequiredArgsConstructor;
 
 @Service
 public class PaymentEventConsumer {
@@ -16,9 +17,11 @@ public class PaymentEventConsumer {
 		this.emailSer = emailSer;
 	}
 
+	private static final Logger log= LoggerFactory.getLogger(PaymentEventConsumer.class);
+
 	@KafkaListener(topics = "payment-events", groupId = "payment-group")
 	public void consume(PaymentEvent event) {
-		System.out.println("Received Event: "+event);
+		log.info("Received Event:{}",event);
 		emailSer.sendNotification(event);
 	}
 }
