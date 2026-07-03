@@ -1,9 +1,5 @@
 package com.payment.service;
 
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -13,15 +9,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.payment.dto.FraudRequest;
@@ -31,8 +21,6 @@ import com.payment.dto.PaymentEventDTO;
 import com.payment.dto.PaymentHistoryDTO;
 import com.payment.dto.PaymentRequestDTO;
 import com.payment.dto.PaymentResponseDTO;
-import com.payment.dto.PaymentSummaryDTO;
-import com.payment.dto.ReportRequestDTO;
 import com.payment.entity.AuditLog;
 import com.payment.entity.FailedTransaction;
 import com.payment.entity.Payment;
@@ -71,48 +59,24 @@ public class PaymentService {
 	public PaymentResponseDTO savePay(PaymentRequestDTO req, String username)
 			throws InvalidPaymentException, JsonProcessingException {
 
-		if ("CARD".equals(req.getPaymentType())) {
+		validate(req);
 
-			if (req.getCardNo() == null || req.getCardNo().isBlank()) {
-				throw new InvalidPaymentException("Card Number Required");
-			}
-
-		}
-
-		if ("BANK".equals(req.getPaymentType())) {
-
-			if (req.getAccountNo() == null || req.getAccountNo().isBlank()) {
-				throw new InvalidPaymentException("Account Number Required");
-			}
-
-			if (req.getBankName() == null || req.getBankName().isBlank()) {
-				throw new InvalidPaymentException("Bank Name Required");
-			}
-
-		}
-
-		Payment payment = new Payment();
-
-		payment.setAmount(req.getAmount());
-		payment.setPaymentType(req.getPaymentType());
-		payment.setCreatedBy(username);
-		payment.setPaymentTime(LocalDateTime.now());
-		payment.setEmail(req.getEmail());
-		payment.setStatus(PaymentStatus.FRAUD_PENDING);
-		payment.setMessage("Fraud Verification Pending");
+		Payment payment=createPay(req,username);
 
 		payment = repo.save(payment);
 
-		FraudRequest fraudRequest = new FraudRequest();
 
+		FraudRequest fraudRequest = new FraudRequest();
 		fraudRequest.setCardNo(req.getCardNo());
 		fraudRequest.setAmount(req.getAmount());
 
 		try {
 
 			FraudResponse fraudResponse = rest.postForObject(url, fraudRequest, FraudResponse.class);
-
-			if ("SAFE".equals(fraudResponse.getStatus())) {
+			if(fraudResponse==null){
+				throw new NullPointerException("Fraud Response is null");
+			}
+            if ("SAFE".equals(fraudResponse.getStatus())) {
 
 				if (payment.getAmount() <= 1000) {
 
@@ -163,112 +127,49 @@ public class PaymentService {
 
 		}
 
-		AuditLog log = new AuditLog();
-
-		log.setUsername(username);
-		log.setRole("MAKER");
-		log.setAction("CREATED PAYMENT");
-		log.setPaymentId(payment.getId());
-		log.setPaymentType(payment.getPaymentType());
-		log.setAmount(payment.getAmount());
-		log.setPaymentStatus(payment.getStatus().name());
-		log.setActionTime(LocalDateTime.now());
-
-		au_repo.save(log);
-
-		PaymentResponseDTO res = new PaymentResponseDTO();
-
-		res.setStatus(payment.getStatus());
-		res.setMessage(payment.getMessage());
-		res.setPaymentType(payment.getPaymentType());
-		res.setAmount(payment.getAmount());
-		res.setPaymentTime(payment.getPaymentTime());
+		saveAudit(payment,username,"MAKER","PAYMENT CREATED");
 
 		produce.publishPayEvent(createPaymentEvent(payment));
 
-		return res;
+		return buildResponse(payment);
 	}
 
-	// producer method......
-	private PaymentEvent createPaymentEvent(Payment payment) {
 
-		PaymentEvent event = new PaymentEvent();
-
-		event.setPaymentId(payment.getId());
-		event.setPaymentType(payment.getPaymentType());
-		event.setAmount(payment.getAmount());
-		event.setStatus(payment.getStatus());
-		event.setEmail(payment.getEmail());
-		event.setMessage(payment.getMessage());
-		event.setPaymentTime(payment.getPaymentTime());
-
-		return event;
-	}
 
 	public List<Payment> pendingStatus() {
 		return repo.findByStatus(PaymentStatus.PENDING_APPROVAL);
 	}
 
 	public Payment approvePayment(Long id, String user) {
-		Payment u = repo.findById(id).orElseThrow(() -> new UsernameNotFoundException("User not found"));
+		Payment u=getPayment(id);
 		u.setStatus(PaymentStatus.APPROVED);
 		u.setMessage("Approved By Checker");
 		Payment save = repo.save(u);
-		AuditLog log = new AuditLog();
 
-		log.setUsername(user);
-		log.setRole("CHECKER");
-		log.setAction("APPROVED PAYMENT");
-		log.setPaymentId(save.getId());
-		log.setPaymentType(save.getPaymentType());
-		log.setAmount(save.getAmount());
-		log.setPaymentStatus(save.getStatus().name());
-		log.setActionTime(LocalDateTime.now());
+		saveAudit(save,user,"CHECKER","APPROVED PAYMENT");
 
-		au_repo.save(log);
 		produce.publishPayEvent(createPaymentEvent(save));// approve produce
 		return save;
 	}
 
 	public Payment rejectPay(Long id, String user) {
-		Payment u = repo.findById(id).orElseThrow(() -> new UsernameNotFoundException("User not found"));
+		Payment u=getPayment(id);
 		u.setStatus(PaymentStatus.REJECTED);
 		u.setMessage("Rejected By Checker");
 		Payment save = repo.save(u);
-		AuditLog log = new AuditLog();
-		log.setUsername(user);
-		log.setRole("CHECKER");
-		log.setAction("REJECTED PAYMENT");
-		log.setPaymentId(save.getId());
-		log.setPaymentType(save.getPaymentType());
-		log.setAmount(save.getAmount());
-		log.setPaymentStatus(save.getStatus().name());
-		log.setActionTime(LocalDateTime.now());
 
-		au_repo.save(log);
+		saveAudit(save,user,"CHECKER","REJECTED PAYMENT");
+
 		produce.publishPayEvent(createPaymentEvent(save));
 		return save;
 	}
 
-	public PaymentSummaryDTO paymentSum() {
-		PaymentSummaryDTO sum = new PaymentSummaryDTO();
-		long total = repo.count();
-		int ap = repo.countByStatus(PaymentStatus.APPROVED);
-		int re = repo.countByStatus(PaymentStatus.REJECTED);
-		sum.setTotalTransaction(total);
-		sum.setSuccessfulTransaction(ap);
-		sum.setFailedtransaction(re);
-		return sum;
-	}
 
 	public List<Payment> myPay(String name) {
-		List<Payment> list = repo.findByCreatedBy(name);
-		return list;
+		return repo.findByCreatedBy(name);
 	}
 
-	public List<Payment> search(String keyword) {
-		return repo.findByPaymentTypeContainingIgnoreCase(keyword);
-	}
+
 
 	public Page<Payment> get(int page, int size, String keyword) {
 		PageRequest p = PageRequest.of(page, size);
@@ -304,44 +205,10 @@ public class PaymentService {
 		return au_repo.findByUsername(name);
 	}
 
-	public ByteArrayInputStream report(ReportRequestDTO req) throws IOException {
-		LocalDateTime start = req.getStart().atStartOfDay();
-		LocalDateTime end = req.getEnd().atTime(23, 59, 59);
-
-		List<Payment> payments = repo.findByStatusAndPaymentTimeBetween(req.getStatus(), start, end);
-		Workbook wrkBook = new XSSFWorkbook();
-		Sheet sht = wrkBook.createSheet("Payments");
-		Row header = sht.createRow(0);
-		header.createCell(0).setCellValue("ID");
-		header.createCell(1).setCellValue("Payment Type");
-		header.createCell(2).setCellValue("Amount");
-		header.createCell(3).setCellValue("Status");
-		header.createCell(4).setCellValue("Created By");
-		header.createCell(5).setCellValue("Payment Time");
-
-		int rowNum = 1;
-
-		for (Payment p : payments) {
-			Row r = sht.createRow(rowNum++);
-			r.createCell(0).setCellValue(p.getId());
-			r.createCell(1).setCellValue(p.getPaymentType());
-			r.createCell(2).setCellValue(p.getAmount());
-			r.createCell(3).setCellValue(p.getStatus().toString());
-			r.createCell(4).setCellValue(p.getCreatedBy());
-			r.createCell(5).setCellValue(p.getPaymentTime().format(DateTimeFormatter.ISO_DATE));
-		}
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		wrkBook.write(out);
-		wrkBook.close();
-
-		return new ByteArrayInputStream(out.toByteArray());
-	}
 
 	public PaymentHistoryDTO getPaymentHistory(Long paymentId) {
 
-		Payment payment = repo.findById(paymentId)
-				.orElseThrow(() -> new UsernameNotFoundException("Payment Not Found"));
-
+		Payment payment=getPayment(paymentId);
 		List<AuditLog> logs = au_repo.findByPaymentIdOrderByActionTimeAsc(paymentId);
 
 		PaymentHistoryDTO history = new PaymentHistoryDTO();
@@ -375,4 +242,86 @@ public class PaymentService {
 		return history;
 	}
 
+	//GET PAYMENT ID
+	private Payment getPayment(Long id){
+		return repo.findById(id).orElseThrow(()-> new UsernameNotFoundException("Not Found"));
+	}
+
+	//AUDIT
+	private void saveAudit(Payment payment,String username,String role,String action){
+		AuditLog log = new AuditLog();
+		log.setUsername(username);
+		log.setRole(role);
+		log.setAction(action);
+		log.setPaymentId(payment.getId());
+		log.setPaymentType(payment.getPaymentType());
+		log.setAmount(payment.getAmount());
+		log.setPaymentStatus(payment.getStatus().name());
+		log.setActionTime(LocalDateTime.now());
+		au_repo.save(log);
+	}
+	// producer method......
+	private PaymentEvent createPaymentEvent(Payment payment) {
+
+		PaymentEvent event = new PaymentEvent();
+
+		event.setPaymentId(payment.getId());
+		event.setPaymentType(payment.getPaymentType());
+		event.setAmount(payment.getAmount());
+		event.setStatus(payment.getStatus());
+		event.setEmail(payment.getEmail());
+		event.setMessage(payment.getMessage());
+		event.setPaymentTime(payment.getPaymentTime());
+
+		return event;
+	}
+
+	//validate
+	private void validate(PaymentRequestDTO req) throws InvalidPaymentException {
+		if ("CARD".equals(req.getPaymentType())) {
+
+			if (req.getCardNo() == null || req.getCardNo().isBlank()) {
+				throw new InvalidPaymentException("Card Number Required");
+			}
+
+		}
+
+		if ("BANK".equals(req.getPaymentType())) {
+
+			if (req.getAccountNo() == null || req.getAccountNo().isBlank()) {
+				throw new InvalidPaymentException("Account Number Required");
+			}
+
+			if (req.getBankName() == null || req.getBankName().isBlank()) {
+				throw new InvalidPaymentException("Bank Name Required");
+			}
+
+		}
+
+	}
+	//request to set payment
+	private Payment createPay(PaymentRequestDTO req,String user){
+
+		Payment payment = new Payment();
+		payment.setAmount(req.getAmount());
+		payment.setPaymentType(req.getPaymentType());
+		payment.setCreatedBy(user);
+		payment.setPaymentTime(LocalDateTime.now());
+		payment.setEmail(req.getEmail());
+		payment.setStatus(PaymentStatus.FRAUD_PENDING);
+		payment.setMessage("Fraud Verification Pending");
+		return payment;
+	}
+
+	//response
+	private PaymentResponseDTO buildResponse(Payment payment) {
+
+		PaymentResponseDTO response = new PaymentResponseDTO();
+		response.setStatus(payment.getStatus());
+		response.setMessage(payment.getMessage());
+		response.setPaymentType(payment.getPaymentType());
+		response.setAmount(payment.getAmount());
+		response.setPaymentTime(payment.getPaymentTime());
+		return response;
+	}
 }

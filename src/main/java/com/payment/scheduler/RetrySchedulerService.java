@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -24,32 +25,38 @@ import com.payment.repository.PaymentRepo;
 @Component
 public class RetrySchedulerService {
 
-    @Autowired
     private FailedTransactionRepository failedRepo;
 
-    @Autowired
     private PaymentRepo paymentRepo;
 
-    @Autowired
     private AuditLogRepository auditRepo;
 
-    @Autowired
+
     private RestTemplate restTemplate;
 
-    @Autowired
     private ObjectMapper objectMapper;
 
-    @Value("${fraud.service.url}")
-    private static String FRAUD_URL ;;
+    public RetrySchedulerService(ObjectMapper objectMapper, RestTemplate restTemplate, AuditLogRepository auditRepo, PaymentRepo paymentRepo, FailedTransactionRepository failedRepo) {
+        this.objectMapper = objectMapper;
+        this.restTemplate = restTemplate;
+        this.auditRepo = auditRepo;
+        this.paymentRepo = paymentRepo;
+        this.failedRepo = failedRepo;
+    }
 
-    @Scheduled(fixedRate = 3000) 
+    @Value("${fraud.service.url}")
+    private  String FRAUD_URL ;
+
+    @Scheduled(fixedRate = 30000)
     public void retryFailedTransactions() {
 
-        System.out.println("Retry Scheduler Running...");
 
         List<FailedTransaction> transactions =
                 failedRepo.findByStatus(RetryStatus.PENDING);
-
+        if (transactions.isEmpty()) {
+            return;
+        }
+        System.out.println("Retrying " + transactions.size() + " failed transaction(s)");
         for (FailedTransaction f : transactions) {
 
             try {
@@ -57,19 +64,11 @@ public class RetrySchedulerService {
                 
                 if (f.getRetryCount() >= f.getMaxRetryCount()) {
 
-                    Payment pay = paymentRepo.findById(f.getTransactionId())
-                            .orElseThrow(() ->
-                                    new RuntimeException("Payment Not Found"));
+                    Payment pay = getPayId(f.getTransactionId());
 
-                    pay.setStatus(PaymentStatus.FAILED);
-                    pay.setMessage("Maximum Retry Count Reached");
+                    updatePaymentStatus(pay,PaymentStatus.FAILED,"Maximum Retry Reached");
 
-                    paymentRepo.save(pay);
-
-                    f.setStatus(RetryStatus.FAILED);
-                    f.setUpdatedAt(LocalDateTime.now());
-
-                    failedRepo.save(f);
+                    updateRetryStatus(f,RetryStatus.FAILED);
 
                     saveAudit(pay, "MAX RETRY REACHED");
 
@@ -90,31 +89,20 @@ public class RetrySchedulerService {
                         );
 
               
-                Payment pay =
-                        paymentRepo.findById(f.getTransactionId())
-                                .orElseThrow(() ->
-                                        new RuntimeException("Payment Not Found"));
+                Payment pay =getPayId(f.getTransactionId());
 
                 
                 if ("SAFE".equals(fraudResponse.getStatus())) {
 
                     if (pay.getAmount() <= 1000) {
-
-                        pay.setStatus(PaymentStatus.APPROVED);
-                        pay.setMessage("Payment Approved Automatically");
-
+                        updatePaymentStatus(pay,PaymentStatus.APPROVED,"Payment Approved Automatically");
                     } else {
 
-                        pay.setStatus(PaymentStatus.PENDING_APPROVAL);
-                        pay.setMessage("Waiting for Checker Approval");
+                        updatePaymentStatus(pay,PaymentStatus.PENDING_APPROVAL,"Waiting for Checker Approval");
                     }
 
-                    paymentRepo.save(pay);
 
-                    f.setStatus(RetryStatus.COMPLETED);
-                    f.setUpdatedAt(LocalDateTime.now());
-
-                    failedRepo.save(f);
+                   updateRetryStatus(f,RetryStatus.COMPLETED);
 
                     saveAudit(pay, "FRAUD RETRY SUCCESS");
                 }
@@ -122,15 +110,9 @@ public class RetrySchedulerService {
                 
                 else {
 
-                    pay.setStatus(PaymentStatus.FAILED);
-                    pay.setMessage(fraudResponse.getMessage());
+                    updatePaymentStatus(pay,PaymentStatus.FAILED,fraudResponse.getMessage());
 
-                    paymentRepo.save(pay);
-
-                    f.setStatus(RetryStatus.FAILED);
-                    f.setUpdatedAt(LocalDateTime.now());
-
-                    failedRepo.save(f);
+                    updateRetryStatus(f,RetryStatus.FAILED);
 
                     saveAudit(pay, "FRAUD RETRY FAILED");
                 }
@@ -183,4 +165,22 @@ public class RetrySchedulerService {
         auditRepo.save(log);
     }
 
+
+    private void updatePaymentStatus(Payment pay,PaymentStatus status,String msg){
+        pay.setStatus(status);
+        pay.setMessage(msg);
+        paymentRepo.save(pay);
+    }
+
+    private Payment getPayId(Long id){
+       return paymentRepo.findById(id).orElseThrow(()->new UsernameNotFoundException("Payment Not found"));
+    }
+
+    private void updateRetryStatus(FailedTransaction fail,
+                                   RetryStatus status) {
+
+        fail.setStatus(status);
+        fail.setUpdatedAt(LocalDateTime.now());
+        failedRepo.save(fail);
+    }
 }

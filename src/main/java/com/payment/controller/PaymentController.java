@@ -3,6 +3,8 @@ package com.payment.controller;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.List;
+
+import com.payment.service.ReportService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
@@ -36,10 +38,12 @@ import jakarta.validation.Valid;
 public class PaymentController {
 
 	PaymentService ser;
+	ReportService reportSer;
 
 	@Autowired
-	public PaymentController(PaymentService ser) {
+	public PaymentController(PaymentService ser,ReportService reportSer) {
 		this.ser = ser;
+		this.reportSer=reportSer;
 	}
 
 	@PostMapping("/payment")
@@ -70,10 +74,6 @@ public class PaymentController {
 		return ResponseEntity.ok(ser.myPay(name));
 	}
 
-	@GetMapping("payment/details")
-	public ResponseEntity<PaymentSummaryDTO> details() {
-		return ResponseEntity.ok(ser.paymentSum());
-	}
 
 	@GetMapping("payment/get")
 	public ResponseEntity<Page<Payment>> get(@RequestParam(defaultValue = "0") int page,
@@ -90,7 +90,7 @@ public class PaymentController {
 	public ResponseEntity<InputStreamResource> generateReport(@RequestBody ReportRequestDTO request)
 			throws IOException {
 
-		ByteArrayInputStream in = ser.report(request);
+		ByteArrayInputStream in = reportSer.report(request);
 
 		HttpHeaders headers = new HttpHeaders();
 
