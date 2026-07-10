@@ -178,7 +178,7 @@ public class RetrySchedulerService {
         paymentRepo.save(pay);
     }
 
-    //get payment using id .. if it not, throw the exception
+    //get payment using id  if it not, throw the exception
     private Payment getPayId(Long id){
        return paymentRepo.findById(id).orElseThrow(()->new UsernameNotFoundException("Payment Not found"));
     }

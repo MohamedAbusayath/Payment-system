@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 
 import com.payment.dto.PaymentEvent;
 
-import lombok.RequiredArgsConstructor;
 
 @Service
 public class EmailService {
@@ -52,7 +51,7 @@ public class EmailService {
 
 				Thank You.
 
-				 """.formatted(event.getPaymentId(), event.getPaymentType(), event.getAmount(), event.getStatus(),
+			 """.formatted(event.getPaymentId(), event.getPaymentType(), event.getAmount(), event.getStatus(),
 				event.getMessage(), event.getPaymentTime());
 	}
 

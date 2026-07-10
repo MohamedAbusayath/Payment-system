@@ -1,5 +1,7 @@
 package com.payment.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -8,10 +10,9 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.payment.dto.FraudRequest;
@@ -56,20 +57,17 @@ public class PaymentService {
 		this.produce = produce;
 	}
 
-
+    @Transactional
 	public PaymentResponseDTO savePay(PaymentRequestDTO req, String username)
 			throws InvalidPaymentException, JsonProcessingException {
 
-		validate(req);
+		validate(req);//validation
 
-		Payment payment=createPay(req,username);
+		Payment payment=createPay(req,username);//set payment
 
-		payment = repo.save(payment);
+		payment = repo.save(payment);//save
 
-
-		FraudRequest fraudRequest = new FraudRequest();
-		fraudRequest.setCardNo(req.getCardNo());
-		fraudRequest.setAmount(req.getAmount());
+		FraudRequest fraudRequest = createFraudRequest(req);//fraudRequest create
 
 		try {
 
@@ -77,55 +75,15 @@ public class PaymentService {
 			if(fraudResponse==null){
 				throw new NullPointerException("Fraud Response is null");
 			}
-            if ("SAFE".equals(fraudResponse.getStatus())) {
 
-				if (payment.getAmount() <= 1000) {
-
-					payment.setStatus(PaymentStatus.APPROVED);
-					payment.setMessage("Payment Approved Automatically");
-
-				} else {
-
-					payment.setStatus(PaymentStatus.PENDING_APPROVAL);
-					payment.setMessage("Waiting for Checker Approval");
-
-				}
-
-			}
-
-			else {
-
-				payment.setStatus(PaymentStatus.FAILED);
-				payment.setMessage(fraudResponse.getMessage());
-
-			}
+            updatePaymentStatus(payment,fraudResponse);//update payment status
 
 			repo.save(payment);
 
 		}
 
 		catch (Exception ex) {
-
-			FailedTransaction failed = new FailedTransaction();
-
-			failed.setTransactionId(payment.getId());
-
-			failed.setRequest(objectMapper.writeValueAsString(fraudRequest));
-
-			failed.setFailureType(ex.getClass().getSimpleName());
-
-			failed.setRetryCount(0);
-
-			failed.setMaxRetryCount(10);
-
-			failed.setStatus(RetryStatus.PENDING);
-
-			failed.setCreatedAt(LocalDateTime.now());
-
-			failed.setUpdatedAt(LocalDateTime.now());
-
-			failedRepo.save(failed);
-
+			saveFailedTransaction(payment,fraudRequest,ex);//failed transaction
 		}
 
 		saveAudit(payment,username,"MAKER","PAYMENT CREATED");
@@ -142,27 +100,11 @@ public class PaymentService {
 	}
 
 	public Payment approvePayment(Long id, String user) {
-		Payment u=getPayment(id);
-		u.setStatus(PaymentStatus.APPROVED);
-		u.setMessage("Approved By Checker");
-		Payment save = repo.save(u);
-
-		saveAudit(save,user,"CHECKER","APPROVED PAYMENT");
-
-		produce.publishPayEvent(createPaymentEvent(save));// approve produce
-		return save;
+		return updateCheckerDecision(id,user,PaymentStatus.APPROVED,"Approved By Checker","APPROVED PAYMENT");
 	}
 
 	public Payment rejectPay(Long id, String user) {
-		Payment u=getPayment(id);
-		u.setStatus(PaymentStatus.REJECTED);
-		u.setMessage("Rejected By Checker");
-		Payment save = repo.save(u);
-
-		saveAudit(save,user,"CHECKER","REJECTED PAYMENT");
-
-		produce.publishPayEvent(createPaymentEvent(save));
-		return save;
+		return updateCheckerDecision(id,user,PaymentStatus.REJECTED,"Rejected By Checker","REJECTED  PAYMENT");
 	}
 
 
@@ -179,8 +121,8 @@ public class PaymentService {
 				return cB.conjunction();
 			return cB.or(cB.like(cB.lower(r.get("paymentType")), "%" + keyword.toLowerCase() + "%"),
 					cB.like(cB.lower(r.get("createdBy")), "%" + keyword.toLowerCase() + "%"),
-					cB.equal(r.get("id"), isNumber(keyword) ? Long.valueOf(keyword) : -1L),
-					cB.equal(r.get("amount"), isNumber(keyword) ? Long.valueOf(keyword) : -1L));
+					cB.equal(r.get("id"), isNumber(keyword) ? Long.parseLong(keyword) : -1L),
+					cB.equal(r.get("amount"), isNumber(keyword) ? Long.parseLong(keyword) : -1L));
 		};
 		return repo.findAll(sp, p);
 
@@ -189,7 +131,7 @@ public class PaymentService {
 	private boolean isNumber(String keyword) {
 
 		try {
-			Double.parseDouble(keyword);
+			Long.parseLong(keyword);
 			return true;
 		} catch (Exception e) {
 			return false;
@@ -204,6 +146,7 @@ public class PaymentService {
 			return au_repo.findAll();
 
 		return au_repo.findByUsername(name);
+
 	}
 
 
@@ -224,9 +167,8 @@ public class PaymentService {
 			history.setFinalStatus("FAILED");
 		}
 
-		List<PaymentEventDTO> events = new ArrayList<>();
 
-		for (AuditLog log : logs) {
+		List<PaymentEventDTO> events = logs.stream().map(log -> {
 
 			PaymentEventDTO dto = new PaymentEventDTO();
 
@@ -234,15 +176,14 @@ public class PaymentService {
 			dto.setUsername(log.getUsername());
 			dto.setRole(log.getRole());
 			dto.setActionTime(log.getActionTime());
-
-			events.add(dto);
-		}
+			return dto;
+		}).toList();
 
 		history.setEvents(events);
-
 		return history;
 	}
 
+	//helper methods below
 	//GET PAYMENT ID
 	private Payment getPayment(Long id){
 		return repo.findById(id).orElseThrow(()-> new UsernameNotFoundException("Not Found"));
@@ -325,4 +266,79 @@ public class PaymentService {
 		response.setPaymentTime(payment.getPaymentTime());
 		return response;
 	}
+
+	//FraudRequest
+	private FraudRequest createFraudRequest(PaymentRequestDTO req){
+		FraudRequest fraud=new FraudRequest();
+		fraud.setAmount(req.getAmount());
+		fraud.setCardNo(req.getCardNo());
+		return fraud;
+	}
+
+	//Update payment Status
+	private void updatePaymentStatus(Payment payment,FraudResponse fraudResponse){
+		if ("SAFE".equals(fraudResponse.getStatus())) {
+
+			if (payment.getAmount() <= 1000) {
+
+				payment.setStatus(PaymentStatus.APPROVED);
+				payment.setMessage("Payment Approved Automatically");
+
+			} else {
+
+				payment.setStatus(PaymentStatus.PENDING_APPROVAL);
+				payment.setMessage("Waiting for Checker Approval");
+
+			}
+
+		}
+
+		else {
+
+			payment.setStatus(PaymentStatus.FAILED);
+			payment.setMessage(fraudResponse.getMessage());
+
+		}
+	}
+
+	//save failed transaction
+	private void saveFailedTransaction(Payment payment,FraudRequest req,Exception ex) throws JsonProcessingException{
+		FailedTransaction failed = new FailedTransaction();
+
+		failed.setTransactionId(payment.getId());
+
+		failed.setRequest(objectMapper.writeValueAsString(req));
+
+		failed.setFailureType(ex.getClass().getSimpleName());
+
+		failed.setRetryCount(0);
+
+		failed.setMaxRetryCount(10);
+
+		failed.setStatus(RetryStatus.PENDING);
+
+		failed.setCreatedAt(LocalDateTime.now());
+
+		failed.setUpdatedAt(LocalDateTime.now());
+
+		failedRepo.save(failed);
+	}
+
+	//Checker decision Reject/Approve
+	private Payment updateCheckerDecision(Long id,String user,PaymentStatus status,String message,String action){
+		Payment payment = getPayment(id);
+
+		payment.setStatus(status);
+		payment.setMessage(message);
+
+		Payment savedPayment = repo.save(payment);
+
+		saveAudit(savedPayment, user, "CHECKER", action);
+
+		produce.publishPayEvent(createPaymentEvent(savedPayment));
+
+		return savedPayment;
+	}
+
+
 }

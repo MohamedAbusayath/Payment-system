@@ -25,7 +25,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.payment.dto.PaymentHistoryDTO;
 import com.payment.dto.PaymentRequestDTO;
 import com.payment.dto.PaymentResponseDTO;
-import com.payment.dto.PaymentSummaryDTO;
 import com.payment.dto.ReportRequestDTO;
 import com.payment.entity.AuditLog;
 import com.payment.entity.Payment;
