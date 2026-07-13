@@ -3,9 +3,11 @@ package com.payment.scheduler;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.payment.security.ServiceJwtProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
@@ -36,14 +38,18 @@ public class RetrySchedulerService {
 
     private final ObjectMapper objectMapper;
 
+    private final ServiceJwtProvider serviceJwtProvider;
+
     public RetrySchedulerService(ObjectMapper objectMapper,RestTemplate restTemplate,
                                  AuditLogRepository auditRepo,PaymentRepo paymentRepo,
-                                 FailedTransactionRepository failedRepo) {
+                                 FailedTransactionRepository failedRepo,
+                                 ServiceJwtProvider serviceJwtProvider) {
         this.objectMapper = objectMapper;
         this.restTemplate = restTemplate;
         this.auditRepo = auditRepo;
         this.paymentRepo = paymentRepo;
         this.failedRepo = failedRepo;
+        this.serviceJwtProvider=serviceJwtProvider;
     }
 
     private static final Logger log =
@@ -61,7 +67,6 @@ public class RetrySchedulerService {
         if (transactions.isEmpty()) {
             return;
         }
-        System.out.println("Retrying " + transactions.size() + " failed transaction(s)");
 
         log.info("Retrying {} failed transaction(s)",transactions.size());
 
@@ -89,12 +94,24 @@ public class RetrySchedulerService {
                                 FraudRequest.class
                         );
 
-                FraudResponse fraudResponse =
-                        restTemplate.postForObject(
+                String token = serviceJwtProvider.generateToken();
+
+                HttpHeaders headers = new HttpHeaders();
+                headers.setBearerAuth(token);
+                headers.setContentType(MediaType.APPLICATION_JSON);
+
+                HttpEntity<FraudRequest> requestEntity =
+                        new HttpEntity<>(fraudRequest, headers);
+
+                ResponseEntity<FraudResponse> response =
+                        restTemplate.exchange(
                                 FRAUD_URL,
-                                fraudRequest,
+                                HttpMethod.POST,
+                                requestEntity,
                                 FraudResponse.class
                         );
+
+                FraudResponse fraudResponse = response.getBody();
               
                 Payment pay =getPayId(f.getTransactionId());
                 if(fraudResponse==null) throw new UsernameNotFoundException("FraudResponse Null");

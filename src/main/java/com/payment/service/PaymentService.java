@@ -2,17 +2,18 @@ package com.payment.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import com.payment.security.ServiceJwtProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.payment.dto.FraudRequest;
@@ -42,19 +43,22 @@ public class PaymentService {
 	private final FailedTransactionRepository failedRepo;
 	private final ObjectMapper objectMapper;
 	private final PaymentEventProducer produce;
+	private final ServiceJwtProvider jwtProvider;
 
 	@Value("${fraud.service.url}")
 	private String url;
 
 	@Autowired
 	public PaymentService(PaymentRepo repo, AuditLogRepository au_repo, RestTemplate rest,
-			FailedTransactionRepository failedRepo, ObjectMapper objectMapper, PaymentEventProducer produce) {
+			              FailedTransactionRepository failedRepo, ObjectMapper objectMapper,
+						  PaymentEventProducer produce,ServiceJwtProvider jwtProvider) {
 		this.repo = repo;
 		this.au_repo = au_repo;
 		this.rest = rest;
 		this.failedRepo = failedRepo;
 		this.objectMapper = objectMapper;
 		this.produce = produce;
+		this.jwtProvider=jwtProvider;
 	}
 
     @Transactional
@@ -70,8 +74,18 @@ public class PaymentService {
 		FraudRequest fraudRequest = createFraudRequest(req);//fraudRequest create
 
 		try {
-
-			FraudResponse fraudResponse = rest.postForObject(url, fraudRequest, FraudResponse.class);
+			String token = jwtProvider.generateToken();
+			HttpHeaders header=new HttpHeaders();
+			header.setBearerAuth(token);
+			header.setContentType(MediaType.APPLICATION_JSON);
+			HttpEntity<FraudRequest> entity=new HttpEntity<>(fraudRequest,header);
+			ResponseEntity<FraudResponse> responce = rest.exchange(
+					url,
+					HttpMethod.POST,
+					entity,
+					FraudResponse.class
+			);
+			FraudResponse fraudResponse = responce.getBody();
 			if(fraudResponse==null){
 				throw new NullPointerException("Fraud Response is null");
 			}
