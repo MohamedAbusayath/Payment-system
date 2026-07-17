@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: payment-system
+  labels:
+    app: payment-system
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: payment-system
+
+  template:
+    metadata:
+      labels:
+        app: payment-system
+
+    spec:
+      containers:
+        - name: payment-system
+          image: payment-system:1.0
+
+          ports:
+            - containerPort: 8080
+
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://host.docker.internal:3306/doodleblue"
+
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:9092"
