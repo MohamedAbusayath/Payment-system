@@ -22,13 +22,65 @@ spec:
       containers:
         - name: payment-system
           image: payment-system:1.0
+          imagePullPolicy: Never
 
           ports:
             - containerPort: 8080
 
           env:
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:mysql://host.docker.internal:3306/doodleblue"
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-config
+                  key: SPRING_DATASOURCE_URL
 
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              value: "kafka:9092"
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-config
+                  key: SPRING_KAFKA_BOOTSTRAP_SERVERS
+
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: payment-secret
+                  key: SPRING_DATASOURCE_USERNAME
+
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-secret
+                  key: SPRING_DATASOURCE_PASSWORD
+
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: payment-secret
+                  key: JWT_SECRET
+
+          volumeMounts:
+            - name: payment-storage
+              mountPath: /payment-data
+
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 120
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+
+      volumes:
+        - name: payment-storage
+          persistentVolumeClaim:
+            claimName: payment-pvc

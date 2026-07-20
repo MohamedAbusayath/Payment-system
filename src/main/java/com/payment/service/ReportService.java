@@ -9,9 +9,7 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -51,6 +49,20 @@ public class ReportService {
             r.createCell(4).setCellValue(p.getCreatedBy());
             r.createCell(5).setCellValue(p.getPaymentTime().format(DateTimeFormatter.ISO_DATE));
         }
+
+        String folder = "/payment-data/reports";
+
+        File dir = new File(folder);
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+
+        String filePath = folder + "/PaymentReport.xlsx";
+
+        FileOutputStream fileOut = new FileOutputStream(filePath);
+        wrkBook.write(fileOut);
+        fileOut.close();
+
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         wrkBook.write(out);
         wrkBook.close();
