@@ -1,5 +1,10 @@
 image: maven:3.9.11-eclipse-temurin-25
 
+definitions:
+  services:
+    docker:
+      memory: 2048
+
 pipelines:
   default:
     - step:
