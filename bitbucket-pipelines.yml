@@ -3,8 +3,16 @@ image: maven:3.9.11-eclipse-temurin-25
 pipelines:
   default:
     - step:
-        name: Build Payment System
+        name: Build and Push Docker Image
+
+        services:
+          - docker
+
         caches:
           - maven
+
         script:
           - mvn clean install
+          - docker build -t abusayath/payment-system:1.0 .
+          - docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+          - docker push abusayath/payment-system:1.0
