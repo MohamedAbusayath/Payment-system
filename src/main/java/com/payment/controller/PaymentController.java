@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.util.List;
 
 import com.payment.service.ReportService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
@@ -34,6 +36,11 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api")
+@Tag(name = "Payment Management",
+description = "APIs for creating, approving, rejecting, and viewing payments")
+@SecurityRequirement(
+		name = "Bearer Authentication"
+)
 public class PaymentController {
 
 	PaymentService ser;

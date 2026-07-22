@@ -16,6 +16,7 @@ import com.payment.security.JwtAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
+
 public class SecurityConfig {
 
 	private final JwtAuthenticationFilter jwtFilter;
@@ -31,7 +32,9 @@ public class SecurityConfig {
 		return http.csrf(csrf -> csrf.disable())
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(req -> req
-						.requestMatchers("/auth/register", "/auth/login", "/api/payment/history","/sec/encode","/sec/decode","/actuator/**").permitAll()
+						.requestMatchers("/auth/register", "/auth/login", "/api/payment/history","/sec/encode","/sec/decode","/actuator/**","/swagger-ui/**",
+								"/v3/api-docs/**",
+								"/swagger-ui.html").permitAll()
 						.requestMatchers("/api/payment", "/api/payment/my").hasRole("MAKER")
 						.requestMatchers("/api/payment/pending", "/api/payment/approve/**", "/api/payment/reject/**",
 								"/api/payment/delete/**")

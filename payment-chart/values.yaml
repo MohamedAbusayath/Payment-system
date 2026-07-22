@@ -4,9 +4,9 @@ app:
   name: payment-system
 
 image:
-  repository: payment-system
+  repository: abusayath/payment-system
   tag: "2.0"
-  pullPolicy: Never
+  pullPolicy: Always
 
 service:
   type: ClusterIP
